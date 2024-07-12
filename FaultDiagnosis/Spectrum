@@ -1,0 +1,261 @@
+package FaultDiagnosis;
+
+import org.apache.commons.math3.complex.Complex;
+import org.apache.commons.math3.stat.StatUtils;
+import org.apache.commons.math3.transform.DftNormalization;
+import org.apache.commons.math3.transform.FastFourierTransformer;
+import org.apache.commons.math3.transform.TransformType;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
+import static FaultDiagnosis.DataProcessor.*;
+
+public class Spectrum {
+    //单行数据进行快速傅立叶变换
+    public static Complex[] fftTransform(double[] data) {
+        FastFourierTransformer transformer = new FastFourierTransformer(DftNormalization.STANDARD);
+        Complex[] transformData = transformer.transform(data, TransformType.FORWARD);
+        return transformData;
+    }
+
+    //所有数据进行FFT
+    public static Complex[][] allTransformedData(double[][] allData) {
+        Complex[][] allTransformedData = new Complex[allData.length][];
+        for (int i=0; i< allData.length; i++) {
+            allTransformedData[i] = fftTransform(allData[i]);
+        }
+        return allTransformedData;
+    }
+
+    //计算单行数据频谱图的幅值
+    public static double[] calculateAmplitude(Complex[] transformData) {
+        double[] amplitude = new double[transformData.length/2+1];
+
+        for (int i = 0; i < transformData.length/2+1; i++) {
+            double magnitude = transformData[i].abs();
+            if (i==0 || i==transformData.length/2) {
+                amplitude[i] = magnitude/transformData.length;
+            } else {
+                amplitude[i] = magnitude/(transformData.length/2.0);
+            }
+        }
+        return amplitude;
+    }
+
+    //计算所有幅值
+    public static double[][] getAllAmps(Complex[][] allTransformedData) {
+        double[][] allAmps = new double[allTransformedData.length][];
+        for (int i=0; i<allTransformedData.length; i++) {
+            allAmps[i] = calculateAmplitude(allTransformedData[i]);
+        }
+        return allAmps;
+    }
+
+    //计算频率
+    public static double[] calculateFrequencies(int sampleFrequency, int samplePointsNum) {
+        double[] frequencies = new double[samplePointsNum/2+1];
+        double frequencyResolution = (double) sampleFrequency/samplePointsNum;
+        for (int i = 0; i<samplePointsNum/2+1; i++) {
+            frequencies[i] = i*frequencyResolution;
+        }
+        return frequencies;
+    }
+
+    //计算单行数据的1X频率
+    public static double fundamentalFrequency(double[] amplitudes, double[] frequencies) {
+        double max = StatUtils.max(amplitudes);
+        int index = -1;
+        for (int i=0; i<amplitudes.length;i++) {
+            if(Double.compare(amplitudes[i],max)==0) {
+                index = i;
+                break;
+            }
+        }
+        if(index == -1) {
+            return 0;
+        }
+        return frequencies[index];
+    }
+
+    //1X频率所有数据
+    public static double[] fundamentalFrequencies(double[][] allAmplitudes, double[] frequencies) {
+        double[] fundaFrequencies = new double[allAmplitudes.length];
+        for(int i = 0; i<allAmplitudes.length;i++) {
+            fundaFrequencies[i] = fundamentalFrequency(allAmplitudes[i], frequencies);
+        }
+        return fundaFrequencies;
+    }
+
+    //1X幅值所有数据
+    public static double[] fundamentalAmplitude(double[][] amplitudes) {
+        double[] fundAmp = new double[amplitudes.length];
+        for (int i=0; i<amplitudes.length; i++) {
+            fundAmp[i] = StatUtils.max(amplitudes[i]);
+        }
+        return fundAmp;
+    }
+
+    //计算倍频
+    public static double[] harmonicFrequencies(double[] fundamentalFrequencies,double multiplier) {
+        double[] harmonicFrequencies = new double[fundamentalFrequencies.length];
+        for (int i=0; i<fundamentalFrequencies.length; i++) {
+            harmonicFrequencies[i] = fundamentalFrequencies[i]*multiplier;
+        }
+        return harmonicFrequencies;
+    }
+
+    //找倍频对应幅值
+    public static double findAmplitude(double[] amplitude, double harmonicFrequencies, double[] frequencies) {
+        int index = -1;
+        for (int i=0; i<frequencies.length; i++) {
+            if(Double.compare(harmonicFrequencies, frequencies[i])==0) {
+                index = i;
+                break;
+            }
+        }
+
+        if(index==-1) {
+            return 0;
+        }
+        return amplitude[index];
+    }
+
+    //所有对应幅值
+    public static double[] findAllAmplitudes(double[][] allAmplitude, double[] harmonicFrequencies, double[] frequencies) {
+        double[] foundAmps = new double[allAmplitude.length];
+        for(int i=0; i<allAmplitude.length; i++) {
+            double harmonicFrequency = harmonicFrequencies[i];
+            foundAmps[i] = findAmplitude(allAmplitude[i],harmonicFrequency,frequencies);
+        }
+        return foundAmps;
+    }
+
+    //计算总振动量
+    public static double totalVibration(double[] amplitudes) {
+        double sum = 0;
+        for (int i=0; i<amplitudes.length; i++) {
+            sum += amplitudes[i];
+        }
+        return sum;
+    }
+
+    //计算总振动量 所有数据
+    public static double[] allTotalVibration(double[][] allAmplitudes) {
+        double[] totalVib = new double[allAmplitudes.length];
+        for (int i=0; i<allAmplitudes.length; i++) {
+            totalVib[i] = totalVibration(allAmplitudes[i]);
+        }
+        return totalVib;
+    }
+
+    //计算占比
+    public static double[] ratio(double[] amps, double[] totalVib) {
+        double[] ratio = new double[amps.length];
+        for (int i=0; i<amps.length; i++) {
+            ratio[i] = amps[i]/totalVib[i];
+        }
+        return ratio;
+    }
+
+    public static void writeSpectrumValue(File file, double[][] allData) {
+        try {
+            FileInputStream inputStream = new FileInputStream(file);
+            Workbook workbook = new XSSFWorkbook(inputStream);
+            Sheet sheet = workbook.getSheetAt(0);
+            String[] titles = {"0.5X频率", "1X频率","2X频率", "0.5X幅值","1X幅值", "2X幅值", "总振动量", "0.5X占比", "1X占比", "2X占比"};
+            double[] multiplier = {0.5,1,2,3};
+            double[][] values = new double[10][allData.length];
+
+            //FFT所有数据
+            Complex[][] allTransformedData = allTransformedData(allData);
+            //所有幅值
+            double[][] allAmps = getAllAmps(allTransformedData);
+            //频率
+            double[] frequencies = calculateFrequencies(3200, 1024);
+            //1X频率
+            double[] fundFrequencies = fundamentalFrequencies(allAmps,frequencies);
+
+
+            for(int i=0; i<3; i++) {
+                values[i] = harmonicFrequencies(fundFrequencies,multiplier[i]);
+            }
+
+            //0.5X幅值
+            values[3] = findAllAmplitudes(allAmps, values[0], frequencies);
+            //1X幅值
+            values[4] = fundamentalAmplitude(allAmps);
+            //2X幅值
+            values[5] = findAllAmplitudes(allAmps, values[2], frequencies);
+            //总振动量
+            values[6] = allTotalVibration(allAmps);
+            //0.5X占比
+            values[7] = ratio(values[3], values[6]);
+            //1X占比
+            values[8] = ratio(values[4], values[6]);
+            //2X占比
+            values[9] = ratio(values[5], values[6]);
+
+            for (int i=0; i<values.length; i++) {
+                createColumn(sheet, titles[i], values[i]);
+            }
+
+            inputStream.close();
+
+            FileOutputStream outputStream = new FileOutputStream(file);
+            workbook.write(outputStream);
+            workbook.close();
+            outputStream.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+
+    //Helper function to create column
+    private static void createColumn(Sheet sheet, String title, double[] processedData) {
+        int lastColNum = sheet.getRow(0).getLastCellNum();
+
+        for (int i=0; i<=sheet.getLastRowNum();i++) {
+            Row row = sheet.getRow(i);
+            Cell newCell = row.createCell(lastColNum);
+            if (i==0) {
+                newCell.setCellValue(title);
+            } else {
+                newCell.setCellValue(processedData[i-1]);
+            }
+        }
+    }
+
+
+    public static void main(String[] args) {
+        File file = new File("/Users/helen/Desktop/Internship/测试有线设备-电机驱动端-波形数据.xlsx");
+        double[][] data = readData(file);
+
+        //FFT所有数据
+        Complex[][] allTransformedData = allTransformedData(data);
+        //所有幅值
+        double[][] allAmps = getAllAmps(allTransformedData);
+        //频率
+        double[] frequencies = calculateFrequencies(3200, 1024);
+        //1X频率
+        double[] fundFrequencies = fundamentalFrequencies(allAmps,frequencies);
+        //一倍频
+        //double[] foundFrequencies = fundamentalFrequencies()
+        double[] halfFrequency = harmonicFrequencies(fundFrequencies, 0.5);
+        double[] halfAmp = findAllAmplitudes(allAmps,halfFrequency,frequencies);
+
+         for (int i=0; i<halfAmp.length; i++) {
+             System.out.println(halfAmp[i]);
+         }
+
+    }
+}
