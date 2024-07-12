@@ -1,0 +1,102 @@
+package FaultDiagnosis;
+
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
+import static FaultDiagnosis.DataProcessor.*;
+
+public class DataOutput {
+    public static void writeValue(File file, double[][] allData) {
+        try {
+            FileInputStream inputStream = new FileInputStream(file);
+            Workbook workbook = new XSSFWorkbook(inputStream);
+            Sheet sheet = workbook.getSheetAt(0);
+            String[] titles = {"峰值", "峰峰值","平均幅值", "方差", "有效值", "峭度", "波形指标",
+                    "峰值指标", "裕度指标"};
+            double[][] values = new double[9][allData.length];
+
+            //峰值
+            for(int i=0; i<allData.length;i++) {
+                values[0][i] = peakValue(allData[i]);
+            }
+
+            //峰峰值
+            for(int i=0; i<allData.length;i++) {
+                values[1][i] = peakToPeakValue(allData[i]);
+            }
+
+            //平均幅值
+            for(int i=0; i<allData.length;i++) {
+                values[2][i] = meanAmplitude(allData[i]);
+            }
+
+            //方差
+            for(int i=0; i<allData.length;i++) {
+                values[3][i] = variance(allData[i]);
+            }
+
+            //有效值
+            for(int i=0; i<allData.length;i++) {
+                values[4][i] = rootMeanSquare(allData[i]);
+            }
+
+            //峭度
+            for(int i=0; i<allData.length;i++) {
+                values[5][i] = kurtosis(allData[i]);
+            }
+
+            //波形指标
+            for(int i=0; i<allData.length;i++) {
+                values[6][i] = formFactor(allData[i]);
+            }
+
+            //峰值指标
+            for(int i=0; i<allData.length;i++) {
+                values[7][i] = peakFactor(allData[i]);
+            }
+
+            //裕度指标
+            for(int i=0; i<allData.length;i++) {
+                values[8][i] = marginFactor(allData[i]);
+            }
+
+            for (int i=0; i<9; i++) {
+                createColumn(sheet, titles[i], values[i]);
+            }
+
+            inputStream.close();
+
+            FileOutputStream outputStream = new FileOutputStream(file);
+            workbook.write(outputStream);
+            workbook.close();
+            outputStream.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    //Helper function to create column
+    private static void createColumn(Sheet sheet, String title, double[] processedData) {
+        int lastColNum = sheet.getRow(0).getLastCellNum();
+
+        for (int i=0; i<=sheet.getLastRowNum();i++) {
+            Row row = sheet.getRow(i);
+            Cell newCell = row.createCell(lastColNum);
+            if (i==0) {
+                newCell.setCellValue(title);
+            } else {
+                newCell.setCellValue(processedData[i-1]);
+            }
+        }
+
+    }
+
+}
