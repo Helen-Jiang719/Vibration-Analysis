@@ -1,0 +1,207 @@
+package FaultDiagnosis;
+
+import org.apache.commons.math3.stat.StatUtils;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import java.io.*;
+
+
+public class DataProcessor {
+    /**
+     * read data from Excel
+     * @param file Excel表
+     * @return all data
+     */
+    public static double[][] readData(File file) {
+        try {
+            FileInputStream inputStream = new FileInputStream(file);
+            Workbook workbook = new XSSFWorkbook(inputStream);
+            Sheet sheet = workbook.getSheetAt(0);
+            double[][] allData = getData(sheet);
+            inputStream.close();
+            return allData;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return new double[0][];
+    }
+
+    /**
+     * Helper function to get all data in an Excel sheet
+     * @param sheet Excel sheet
+     * @return all data in the sheet
+     */
+    public static double[][] getData(Sheet sheet) {
+        double[][] allData = new double[sheet.getLastRowNum()][];
+
+        for (int i = 1; i<sheet.getLastRowNum()+1; i++) {
+            Row row = sheet.getRow(i);
+            Cell cell = row.getCell(6);
+            String dataString = cell.getStringCellValue();
+            String modifiedData = dataString.replace("[", "").replace("]", "");
+            double[] dataDouble = toDouble(modifiedData);
+            allData[i-1] = dataDouble;
+        }
+
+        return allData;
+    }
+
+    /**
+     * convert the data from string to double
+     * @param dataString 字符串数据
+     * @return 浮点数数据组
+     */
+    public static double[] toDouble(String dataString) {
+        double[] dataDouble = new double[1024];
+        String[] dataStringList = dataString.split(", ");
+
+        for(int i=0; i<dataStringList.length;i++) {
+            dataDouble[i] = Double.parseDouble(dataStringList[i]);
+        }
+        return dataDouble;
+    }
+
+    /**
+     * Helper method to get absolute value of each data
+     * @param data 数据组
+     * @return 数据绝对值
+     */
+    public static double[] getAbsValue(double[] data) {
+        double[] absData = new double[data.length];
+        for (int i = 0; i < data.length; i++) {
+            absData[i] = Math.abs(data[i]);
+        }
+        return absData;
+    }
+
+    /**
+     * 计算峰值
+     * @param data 数据组
+     * @return 峰值
+     */
+    public static double peakValue(double[] data) {
+        double[] absData = getAbsValue(data);
+        double peak = StatUtils.max(absData);
+
+        return peak;
+    }
+
+    /**
+     * 计算峰峰值
+     * @param data 数据组
+     * @return 峰峰值
+     */
+    public static double peakToPeakValue(double[] data) {
+        return StatUtils.max(data) - StatUtils.min(data);
+    }
+
+    /**
+     * 计算平均幅值
+     * @param data 数据组
+     * @return 平均幅值
+     */
+
+    public static double meanAmplitude(double[] data) {
+        double meanAmp = StatUtils.mean(getAbsValue(data));
+        return meanAmp;
+    }
+
+    /**
+     * 计算方差
+     * @param data 数据组
+     * @return 方差
+     */
+
+    public static double variance(double[] data) {
+        return StatUtils.variance(data);
+    }
+
+    /**
+     * 计算有效值
+     * @param data 数据组
+     * @return 有效值
+     */
+    public static double rootMeanSquare(double[] data) {
+        double squareSum = 0;
+        for (int i = 0; i < data.length; i++) {
+            squareSum += Math.pow(data[i], 2);
+        }
+        return Math.sqrt(squareSum/data.length);
+    }
+
+    /**
+     * 计算峭度
+     * @param data 数据组
+     * @return 峭度
+     */
+
+    public static double kurtosis(double[] data) {
+        double sum = 0;
+        double mean = StatUtils.mean(data);
+        double sd = standardDeviation(data,mean);
+        for (int i = 0; i < data.length; i++) {
+            sum += Math.pow(data[i]-mean, 4);
+        }
+        return sum/((data.length-1)*Math.pow(sd,4));
+    }
+
+    /**
+     * Helper method to get standard deviation
+     * @param data 数据组
+     * @return 标准差
+     */
+    public static double standardDeviation(double[] data, double mean) {
+        double sum = 0;
+        for (int i = 0; i < data.length; i++) {
+            sum += Math.pow(data[i]-mean, 2);
+        }
+        double sd = Math.sqrt(sum/(data.length-1));
+        return sd;
+    }
+
+    /**
+     * 计算波形指标
+     * @param data 数据组
+     * @return 波形指标
+     */
+    public static double formFactor(double[] data) {
+        double absMean = StatUtils.mean(getAbsValue(data));
+        return rootMeanSquare(data)/absMean;
+    }
+
+    /**
+     * 计算峰值指标
+     * @param data 数据组
+     * @return 峰值指标
+     */
+    public static double peakFactor(double[] data) {
+        double peak = peakValue(data);
+        double rms = rootMeanSquare(data);
+        return peak/rms;
+    }
+
+    /**
+     * 计算裕度指标
+     * @param data 数据组
+     * @return 裕度指标
+     */
+    public static double marginFactor(double[] data) {
+        return peakValue(data)/srmAmplitude(data);
+    }
+
+    /**
+     * 计算方根幅值（Helper function）
+     * @param data 数据组
+     * @return 方根幅值
+     */
+    public static double srmAmplitude(double[] data) {
+        double[] absValue = getAbsValue(data);
+        double sum = 0;
+        for (int i = 0; i<absValue.length; i++) {
+            sum += Math.sqrt(absValue[i]);
+        }
+        return Math.pow(sum/data.length, 2);
+    }
+}
