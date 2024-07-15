@@ -1,0 +1,79 @@
+package JDBC;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.sql.*;
+
+public class DatabaseCreator {
+    private final String USER = "root";
+    private final String PASSWORD = "605769";
+    private final String URL = "jdbc:mysql://localhost:3306/";
+    private final String DATABASE_NAME;
+
+    public DatabaseCreator(String databaseName) {
+        this.DATABASE_NAME = databaseName;
+    }
+
+    public void createDatabase() {
+        String createDatabaseStmt = "CREATE DATABASE IF NOT EXISTS " + DATABASE_NAME;
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+            Statement stmt = connection.createStatement()) {
+            stmt.execute(createDatabaseStmt);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void createTable(String createTableStmt) {
+        String tableURL = URL + DATABASE_NAME;
+
+        try (Connection connection = DriverManager.getConnection(tableURL, USER, PASSWORD);
+             Statement stmt = connection.createStatement()) {
+            stmt.execute(createTableStmt);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void insertData(double[] dataToInsert, String insertStatement, String axis, String time, String sensorNumber) {
+        String tableURL = URL + DATABASE_NAME;
+
+        try (Connection connection = DriverManager.getConnection(tableURL, USER, PASSWORD);
+            PreparedStatement pstmt = connection.prepareStatement(insertStatement)) {
+            pstmt.setString(1, axis);
+            pstmt.setString(2, time);
+            pstmt.setString(3, sensorNumber);
+            for (int i = 0; i < dataToInsert.length; i++) {
+                BigDecimal bd = new BigDecimal(dataToInsert[i]);
+                bd = bd.setScale(3, RoundingMode.HALF_UP);
+                pstmt.setDouble(i+4, bd.doubleValue());
+            }
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    public void insertRawData(String acceleration, String velocity, String displacement, String axis, String time, String tableName, String sensorNumber) {
+        String tableURL = URL + DATABASE_NAME;
+        String insertStatement = "INSERT INTO " + tableName + " " +
+                " VALUES (?, ?, ?, ?, ?, ?)";
+
+        try (Connection connection = DriverManager.getConnection(tableURL, USER, PASSWORD);
+             PreparedStatement pstmt = connection.prepareStatement(insertStatement)) {
+            pstmt.setString(1, axis);
+            pstmt.setString(2, time);
+            pstmt.setString(3, sensorNumber);
+            pstmt.setString(4, acceleration);
+            pstmt.setString(5, velocity);
+            pstmt.setString(6, displacement);
+
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+}
