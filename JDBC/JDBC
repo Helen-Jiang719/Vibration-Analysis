@@ -1,0 +1,28 @@
+package JDBC;
+
+import com.mysql.cj.protocol.Resultset;
+
+import java.sql.*;
+
+
+//example
+public class JDBC {
+    public static void main(String[] args) throws SQLException {
+        try{
+        Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/VibrationData",
+                "root",
+                "605769");
+
+        Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery("SELECT * FROM USERS");
+
+        while(resultSet.next()){
+            System.out.println(resultSet.getString("username"));
+            System.out.println(resultSet.getString("password"));
+        }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
