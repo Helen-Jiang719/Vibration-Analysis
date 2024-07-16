@@ -1,0 +1,30 @@
+package FaultDiagnosis;
+
+//时域积分计算速度和位移
+public class IntegrationTimeDomain {
+    //辛普森法则计算积分
+    public static double[] simpsonRule(double[] data) {
+        double TIME_INTERVAL = 1.0/3200.0;
+        double[] velocity = new double[data.length];
+
+        /*double initialSum = data[0] + 4*data[1] + data[2];
+        velocity[0] = initialSum*TIME_INTERVAL/3.0;
+
+         */
+        double sum = 0;
+        for (int i=0; i < data.length; i++) {
+            if(i==0 || i==data.length-1) {
+                sum += data[i];
+            } else if (i%2!=0) {
+                sum += 4*data[i];
+            } else {
+                sum += 2*data[i];
+            }
+
+            velocity[i] = sum*TIME_INTERVAL/3.0;
+        }
+
+        return velocity;
+    }
+
+}
