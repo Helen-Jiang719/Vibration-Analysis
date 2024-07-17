@@ -1,0 +1,73 @@
+package FaultDiagnosis;
+
+
+import JDBC.DatabaseCreator;
+import org.apache.commons.math3.complex.Complex;
+
+import static FaultDiagnosis.DataProcessor.*;
+import static FaultDiagnosis.Spectrum.*;
+
+import java.awt.Color;
+import java.awt.BasicStroke;
+
+import org.jfree.chart.ChartFrame;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.data.xy.XYDataset;
+import org.jfree.data.xy.XYSeries;
+import org.jfree.ui.ApplicationFrame;
+import org.jfree.ui.RefineryUtilities;
+import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.data.xy.XYSeriesCollection;
+import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
+
+public class Plotter {
+    private final double[] accelerationData;
+    private final double[] velocity;
+    private final double[] displacement;
+    private final double[] fftAmplitude;
+    private final double[] timeVector;
+    private final double[] frequencies;
+
+    public Plotter(String accelerationDataString) {
+        double[] accelerationData = toDouble(accelerationDataString);
+        this.accelerationData = accelerationData;
+        IntegrationFrequencyDomain integration = new IntegrationFrequencyDomain(this.accelerationData);
+        this.velocity = integration.integrateResult(1);
+        this.displacement = integration.integrateResult(2);
+        Complex[] fftData = fftTransform(this.accelerationData);
+        this.fftAmplitude = calculateAmplitude(fftData);
+        this.timeVector = timeVector(); //单位ms
+        this.frequencies = calculateFrequencies(3200, 1024);
+    }
+
+    public XYSeriesCollection createDataset(String chartTitle, double[] xData, double[] yData) {
+        XYSeriesCollection collection = new XYSeriesCollection();
+        XYSeries series = new XYSeries(chartTitle);
+        for (int i=0; i<xData.length; i++) {
+            series.add(xData[i], yData[i]);
+        }
+        collection.addSeries(series);
+        return collection;
+    }
+
+    public void plotLineChart(String chartTitle, String xLabel, String yLabel, XYSeriesCollection dataset) {
+        JFreeChart chart = ChartFactory.createXYLineChart(chartTitle, xLabel, yLabel, dataset, PlotOrientation.VERTICAL, true, true, false);
+        ChartFrame chartFrame = new ChartFrame(chartTitle, chart);
+        chartFrame.pack();
+        chartFrame.setVisible(true);
+    }
+
+    public static void main(String[] args) {
+        DatabaseCreator creator = new DatabaseCreator("VibrationData");
+        String dataString = creator.getWaveFormData("加速度", "原始数据", 1);
+        Plotter plotter = new Plotter(dataString);
+        XYSeriesCollection collection = plotter.createDataset("速度", plotter.timeVector, plotter.velocity);
+        plotter.plotLineChart("速度", "时间（ms）", "速度（mm/s）", collection);
+        for(int i = 0; i<plotter.velocity.length; i++) {
+            System.out.println(plotter.velocity[i]);
+        }
+    }
+}
