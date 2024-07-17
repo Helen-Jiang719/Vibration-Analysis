@@ -75,5 +75,25 @@ public class DatabaseCreator {
         }
     }
 
+    public String getWaveFormData(String columnName, String tableName, int id) {
+        String statement = "SELECT * FROM " + tableName + " WHERE id = ?";
+        String dataString = null;
+
+        try (Connection connection = DriverManager.getConnection(TABLE_URL, USER, PASSWORD);
+             PreparedStatement pstmt = connection.prepareStatement(statement)) {
+            pstmt.setInt(1, id);
+
+            try (ResultSet resultSet = pstmt.executeQuery()) {
+                if (resultSet.next()) {
+                    dataString = resultSet.getString(columnName);
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        return dataString;
+    }
+
 
 }
